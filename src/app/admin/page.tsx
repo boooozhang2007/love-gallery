@@ -42,11 +42,15 @@ export default function Admin() {
       body: formData,
     });
 
+    const data = await res.json(); // 解析返回的 JSON
+
     if (res.ok) {
       setFile(null); setCaption(""); setLocation("");
       fetchPhotos();
+      alert("上传成功！");
     } else {
-      alert("上传失败或密码错误");
+      // 弹出具体的后端错误信息
+      alert(`上传失败: ${data.error}`);
     }
     setLoading(false);
   };
