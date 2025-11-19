@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MapPin, Calendar, X } from "lucide-react";
 import type { Photo } from "@/lib/r2";
+import FloatingHearts from "@/components/FloatingHearts";
 
 export default function Home() {
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -17,35 +18,45 @@ export default function Home() {
   const filteredPhotos = filter === "all" ? photos : photos.filter((p) => p.category === filter);
 
   return (
-    <div className="min-h-screen bg-rose-50 text-gray-800 font-sans selection:bg-rose-200">
+    <div className="min-h-screen bg-rose-50 text-gray-800 font-sans selection:bg-rose-200 relative">
+      <FloatingHearts />
+      
       {/* Header */}
-      <header className="py-12 text-center px-4">
+      <header className="py-12 text-center px-4 relative z-10">
         <motion.h1 
           initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
-          className="text-4xl md:text-5xl font-bold text-rose-900 mb-3"
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="text-4xl md:text-5xl font-bold text-rose-900 mb-3 drop-shadow-sm"
         >
           Our Memories 💖
         </motion.h1>
-        <p className="text-rose-700 italic">收集时光的碎片，关于我和你的每一天</p>
+        <motion.p 
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
+          className="text-rose-700 italic"
+        >
+          收集时光的碎片，关于我和你的每一天
+        </motion.p>
         
         {/* Filter Tabs */}
         <div className="mt-8 flex justify-center gap-4">
           {["all", "travel", "daily"].map((f) => (
-            <button
+            <motion.button
               key={f}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => setFilter(f as any)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                filter === f ? "bg-rose-400 text-white shadow-lg" : "bg-white text-rose-600 hover:bg-rose-100"
+              className={`px-6 py-2 rounded-full text-sm font-medium transition-all shadow-sm ${
+                filter === f ? "bg-rose-400 text-white shadow-rose-200 shadow-lg ring-2 ring-rose-200" : "bg-white/80 backdrop-blur-sm text-rose-600 hover:bg-rose-100"
               }`}
             >
               {f === "all" ? "全部" : f === "travel" ? "✈️ 旅行" : "🏠 日常"}
-            </button>
+            </motion.button>
           ))}
         </div>
       </header>
 
       {/* Gallery Grid */}
-      <main className="max-w-6xl mx-auto px-4 pb-20">
+      <main className="max-w-6xl mx-auto px-4 pb-20 relative z-10">
         <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
           {filteredPhotos.map((photo, idx) => (
             <motion.div
@@ -53,17 +64,20 @@ export default function Home() {
               layoutId={photo.id} // 关键：用于平滑过渡动画
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
+              whileHover={{ y: -8, transition: { duration: 0.3 } }} // 悬停上浮效果
               transition={{ delay: idx * 0.05 }}
-              className="break-inside-avoid bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow duration-300 border-2 border-rose-100 cursor-zoom-in group"
+              className="break-inside-avoid bg-white/90 backdrop-blur-sm rounded-2xl overflow-hidden shadow-sm hover:shadow-rose-200 hover:shadow-xl transition-all duration-300 border-2 border-rose-100 cursor-zoom-in group"
               onClick={() => setSelectedPhoto(photo)}
             >
-              <div className="overflow-hidden">
-                <img 
+              <div className="overflow-hidden relative">
+                <motion.img 
+                  layoutId={`img-${photo.id}`}
                   src={photo.url} 
                   alt={photo.caption} 
-                  className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-500" 
+                  className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-700" 
                   loading="lazy" 
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-rose-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               </div>
               <div className="p-4">
                 <p className="text-gray-700 font-medium mb-2">{photo.caption}</p>
@@ -97,7 +111,7 @@ export default function Home() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+            className="fixed inset-0 bg-rose-950/90 z-50 flex items-center justify-center p-4 backdrop-blur-md"
             onClick={() => setSelectedPhoto(null)} // 点击背景关闭
           >
             {/* 关闭按钮 */}
