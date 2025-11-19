@@ -1,65 +1,83 @@
-import Image from "next/image";
+"use client";
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { MapPin, Calendar } from "lucide-react";
+import type { Photo } from "@/lib/r2";
 
 export default function Home() {
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [filter, setFilter] = useState<"all" | "travel" | "daily">("all");
+
+  useEffect(() => {
+    fetch("/api/photos").then((res) => res.json()).then(setPhotos);
+  }, []);
+
+  const filteredPhotos = filter === "all" ? photos : photos.filter((p) => p.category === filter);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="min-h-screen bg-rose-50 text-gray-800 font-sans selection:bg-rose-200">
+      {/* Header */}
+      <header className="py-12 text-center px-4">
+        <motion.h1 
+          initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
+          className="text-4xl md:text-5xl font-bold text-rose-900 mb-3"
+        >
+          Our Memories
+        </motion.h1>
+        <p className="text-rose-700 italic">收集时光的碎片，关于我和你的每一天</p>
+        
+        {/* Filter Tabs */}
+        <div className="mt-8 flex justify-center gap-4">
+          {["all", "travel", "daily"].map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f as any)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                filter === f ? "bg-rose-400 text-white shadow-lg" : "bg-white text-rose-600 hover:bg-rose-100"
+              }`}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              {f === "all" ? "全部" : f === "travel" ? "✈️ 旅行" : "🏠 日常"}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      {/* Gallery Grid */}
+      <main className="max-w-6xl mx-auto px-4 pb-20">
+        <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
+          {filteredPhotos.map((photo, idx) => (
+            <motion.div
+              key={photo.id}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: idx * 0.1 }}
+              className="break-inside-avoid bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow duration-300 border-2 border-rose-100"
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              <img src={photo.url} alt={photo.caption} className="w-full h-auto object-cover" loading="lazy" />
+              <div className="p-4">
+                <p className="text-gray-700 font-medium mb-2">{photo.caption}</p>
+                <div className="flex items-center justify-between text-xs text-rose-400">
+                  <div className="flex items-center gap-1">
+                    <MapPin size={14} />
+                    <span>{photo.location}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Calendar size={14} />
+                    <span>{new Date(photo.date).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          ))}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+        {filteredPhotos.length === 0 && (
+          <div className="text-center py-20 text-rose-300">这里还空空的，去后台上传照片吧~</div>
+        )}
       </main>
+
+      <footer className="text-center py-6 text-rose-300 text-sm">
+        Made with ❤️ for My Girlfriend
+      </footer>
     </div>
   );
 }
