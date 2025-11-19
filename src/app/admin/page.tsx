@@ -25,11 +25,12 @@ export default function Admin() {
     fetch("/api/photos").then(r => r.json()).then(setPhotos);
   }
 
-  const handleUpload = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!file) return;
-    setLoading(true);
+const handleUpload = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!file) return;
+  setLoading(true); // 开始转圈
 
+  try {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("caption", caption);
@@ -42,19 +43,32 @@ export default function Admin() {
       body: formData,
     });
 
-    const data = await res.json(); // 解析返回的 JSON
+    // 尝试解析 JSON，如果解析失败（后端报错返回网页时），这里会抛出错误
+    let data;
+    try {
+      data = await res.json();
+    } catch (jsonError) {
+      throw new Error("服务器返回了无法识别的数据，可能是配置错误或文件太大");
+    }
 
     if (res.ok) {
-      setFile(null); setCaption(""); setLocation("");
-      fetchPhotos();
-      alert("上传成功！");
+      setFile(null);
+      setCaption("");
+      setLocation("");
+      fetchPhotos(); // 刷新列表
+      alert("🎉 上传成功！");
     } else {
-      // 弹出具体的后端错误信息
-      alert(`上传失败: ${data.error}`);
+      // 显示后端返回的具体错误
+      throw new Error(data.error || "上传失败");
     }
-    setLoading(false);
-  };
-
+  } catch (error: any) {
+    console.error("Upload Error:", error);
+    alert(`❌ 错误: ${error.message}`);
+  } finally {
+    // 【关键】无论成功还是失败，最后都必须停止转圈
+    setLoading(false); 
+  }
+};
   const handleDelete = async (id: string) => {
     if (!confirm("确定要删除这张回忆吗？")) return;
     await fetch("/api/photos", {
