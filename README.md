@@ -31,7 +31,7 @@
 ### 1. 克隆项目
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/boooozhang2007/love-gallery.git
 cd love-gallery
 ```
 
@@ -39,10 +39,6 @@ cd love-gallery
 
 ```bash
 npm install
-# 或者
-yarn install
-# 或者
-pnpm install
 ```
 
 ### 3. 配置环境变量
