@@ -181,7 +181,8 @@ export default function Admin() {
               <div className="flex gap-2 overflow-x-auto py-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
                 {files.map((f, i) => (
                   <div key={i} className="relative flex-shrink-0 w-20 h-20 bg-white rounded-lg border border-gray-300 overflow-hidden group">
-                    <img src={URL.createObjectURL(f)} className="w-full h-full object-cover" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={URL.createObjectURL(f)} alt="" className="w-full h-full object-cover" />
                     <button 
                       type="button"
                       onClick={() => removeFile(i)}
@@ -252,7 +253,8 @@ export default function Admin() {
               {photos.map((p) => (
                 <tr key={p.id} className="hover:bg-gray-50 transition">
                   <td className="p-4">
-                    <img src={p.url} className="w-16 h-16 object-cover rounded-lg border border-gray-200" loading="lazy" />
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.url} alt={p.caption} className="w-16 h-16 object-cover rounded-lg border border-gray-200" loading="lazy" />
                   </td>
                   <td className="p-4">
                     <div className="font-bold text-gray-900 text-base mb-1">{p.caption}</div>

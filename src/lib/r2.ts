@@ -1,5 +1,4 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const R2 = new S3Client({
   region: "auto",
@@ -29,7 +28,7 @@ export async function getPhotos(): Promise<Photo[]> {
     const response = await R2.send(command);
     const str = await response.Body?.transformToString();
     return str ? JSON.parse(str) : [];
-  } catch (e) {
+  } catch {
     return []; // 如果文件不存在，返回空数组
   }
 }
