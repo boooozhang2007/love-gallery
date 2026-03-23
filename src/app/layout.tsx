@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Noto_Sans_SC } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const notoSansSc = Noto_Sans_SC({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-noto-sans-sc",
+});
 
 export const metadata: Metadata = {
   title: "Our Love Gallery 💖", // 这里修改浏览器标签页标题
@@ -20,7 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
-      <body className={inter.className}>{children}</body>
+      <body className={`${notoSansSc.className} ${notoSansSc.variable}`}>{children}</body>
     </html>
   );
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { R2, getPhotos, savePhotos, deleteFile, Photo } from "@/lib/r2";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { R2, deleteFile, getPhotos, Photo, savePhotos } from "@/lib/r2";
 
 export const runtime = "nodejs";
 
@@ -30,14 +30,29 @@ function passwordFromAuthorizationHeader(headerValue: string | null) {
 
 function isAuthorized(providedPassword: string | null) {
   const expected = expectedAdminPassword();
-  if (!expected) return false;
-  if (!providedPassword) return false;
+  if (!expected || !providedPassword) return false;
   return normalizePassword(providedPassword) === normalizePassword(expected);
+}
+
+function sortPhotos(photos: Photo[]) {
+  return [...photos].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+function readString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function hasOwn(record: Record<string, unknown>, key: string) {
+  return Object.prototype.hasOwnProperty.call(record, key);
+}
+
+function unauthorizedResponse() {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 }
 
 export async function GET() {
   const photos = await getPhotos();
-  return NextResponse.json(photos.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+  return NextResponse.json(sortPhotos(photos));
 }
 
 export async function POST(req: NextRequest) {
@@ -49,38 +64,39 @@ export async function POST(req: NextRequest) {
 
     const headerPassword = passwordFromAuthorizationHeader(req.headers.get("authorization"));
     const formData = await req.formData();
-
     const bodyPassword = formData.get("password") ?? formData.get("adminPassword") ?? formData.get("auth");
     const providedBodyPassword = typeof bodyPassword === "string" ? bodyPassword : null;
 
     if (!isAuthorized(headerPassword) && !isAuthorized(providedBodyPassword)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
-    const file = formData.get("file") as File;
-    const location = formData.get("location") as string;
-    const caption = formData.get("caption") as string;
-    const category = formData.get("category") as "travel" | "daily";
+    const file = formData.get("file") as File | null;
+    const location = readString(formData.get("location"));
+    const caption = readString(formData.get("caption"));
+    const category = readString(formData.get("category")) || "daily";
+    const collection = readString(formData.get("collection"));
 
-    if (!file) return NextResponse.json({ error: "未找到文件" }, { status: 400 });
+    if (!file) {
+      return NextResponse.json({ error: "未找到文件" }, { status: 400 });
+    }
 
-    // 2. 准备上传
+    if (!caption || !location) {
+      return NextResponse.json({ error: "描述和地点不能为空" }, { status: 400 });
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer());
     const fileKey = `photos/${Date.now()}-${file.name}`;
 
-    console.log("Server: 正在连接 R2 上传图片...");
+    await R2.send(
+      new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: fileKey,
+        Body: buffer,
+        ContentType: file.type,
+      })
+    );
 
-    // 3. 上传图片到 R2
-    await R2.send(new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Key: fileKey,
-      Body: buffer,
-      ContentType: file.type,
-    }));
-
-    console.log("Server: R2 图片上传成功，正在更新数据库...");
-
-    // 4. 更新 metadata.json
     const photos = await getPhotos();
     const newPhoto: Photo = {
       id: crypto.randomUUID(),
@@ -89,20 +105,81 @@ export async function POST(req: NextRequest) {
       location,
       caption,
       category,
+      ...(collection ? { collection } : {}),
       date: new Date().toISOString(),
     };
 
-    photos.push(newPhoto);
-    await savePhotos(photos);
+    await savePhotos(sortPhotos([...photos, newPhoto]));
 
-    console.log("Server: 全部流程完成");
     return NextResponse.json(newPhoto);
-
   } catch (error: unknown) {
-    // 捕获所有服务器端错误并打印
-    console.error("Server Error 详细报错:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "服务器内部错误" }, 
+      { error: error instanceof Error ? error.message : "服务器内部错误" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const expected = expectedAdminPassword();
+    if (!expected) {
+      return NextResponse.json({ error: "Server misconfigured: ADMIN_PASSWORD is not set" }, { status: 500 });
+    }
+
+    const headerPassword = passwordFromAuthorizationHeader(req.headers.get("authorization"));
+    const body = await req.json().catch(() => null);
+    const record = body && typeof body === "object" ? (body as Record<string, unknown>) : null;
+    const bodyPassword = record ? readString(record.password) : "";
+
+    if (!isAuthorized(headerPassword) && !isAuthorized(bodyPassword || null)) {
+      return unauthorizedResponse();
+    }
+
+    if (!record) {
+      return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+    }
+
+    const id = readString(record.id);
+    if (!id) {
+      return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    }
+
+    const photos = await getPhotos();
+    const targetIndex = photos.findIndex((photo) => photo.id === id);
+    if (targetIndex === -1) {
+      return NextResponse.json({ error: "Photo not found" }, { status: 404 });
+    }
+
+    const current = photos[targetIndex];
+    const nextCaption = hasOwn(record, "caption") ? readString(record.caption) : current.caption;
+    const nextLocation = hasOwn(record, "location") ? readString(record.location) : current.location;
+    const nextCategory = hasOwn(record, "category") ? readString(record.category) : current.category;
+
+    if (!nextCaption || !nextLocation || !nextCategory) {
+      return NextResponse.json({ error: "描述、地点和分类不能为空" }, { status: 400 });
+    }
+
+    const updated: Photo = {
+      ...current,
+      caption: nextCaption,
+      location: nextLocation,
+      category: nextCategory,
+    };
+
+    if (hasOwn(record, "collection")) {
+      const nextCollection = readString(record.collection);
+      if (nextCollection) updated.collection = nextCollection;
+      else delete updated.collection;
+    }
+
+    photos[targetIndex] = updated;
+    await savePhotos(sortPhotos(photos));
+
+    return NextResponse.json(updated);
+  } catch (error: unknown) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "服务器内部错误" },
       { status: 500 }
     );
   }
@@ -117,25 +194,32 @@ export async function DELETE(req: NextRequest) {
 
     const headerPassword = passwordFromAuthorizationHeader(req.headers.get("authorization"));
     const body = await req.json().catch(() => null);
-    const bodyPassword = body && typeof body.password === "string" ? body.password : null;
+    const record = body && typeof body === "object" ? (body as Record<string, unknown>) : null;
+    const bodyPassword = record ? readString(record.password) : "";
 
-    if (!isAuthorized(headerPassword) && !isAuthorized(bodyPassword)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!isAuthorized(headerPassword) && !isAuthorized(bodyPassword || null)) {
+      return unauthorizedResponse();
     }
 
-    const id = body && typeof body.id === "string" ? body.id : "";
-    if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    const id = record ? readString(record.id) : "";
+    if (!id) {
+      return NextResponse.json({ error: "Missing id" }, { status: 400 });
+    }
 
     let photos = await getPhotos();
-    const target = photos.find((p) => p.id === id);
+    const target = photos.find((photo) => photo.id === id);
 
     if (target) {
       await deleteFile(target.key);
-      photos = photos.filter((p) => p.id !== id);
-      await savePhotos(photos);
+      photos = photos.filter((photo) => photo.id !== id);
+      await savePhotos(sortPhotos(photos));
     }
+
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "服务器内部错误" }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "服务器内部错误" },
+      { status: 500 }
+    );
   }
 }
