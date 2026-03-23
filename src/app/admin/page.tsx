@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { Trash2, Upload, Loader2, Image as ImageIcon, X } from "lucide-react";
 import imageCompression from "browser-image-compression";
 import type { Photo } from "@/lib/r2";
@@ -16,15 +17,41 @@ export default function Admin() {
   const [caption, setCaption] = useState("");
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState("daily");
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const checkLogin = () => {
-    if (password) setIsLoggedIn(true);
-    fetchPhotos();
+    setAuthError(null);
+    const p = password.trim();
+    if (!p) return;
+
+    fetch("/api/admin/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: p }),
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          setIsLoggedIn(true);
+          fetchPhotos();
+          return;
+        }
+
+        const data = await res.json().catch(() => null);
+        const msg = data && typeof data.error === "string" ? data.error : "登录失败";
+        setAuthError(msg === "Unauthorized" ? "密码错误" : msg);
+      })
+      .catch(() => {
+        setAuthError("网络错误，请稍后重试");
+      });
   };
 
   const fetchPhotos = () => {
     fetch("/api/photos").then(r => r.json()).then(setPhotos);
   }
+
+  useEffect(() => {
+    fetchPhotos();
+  }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -61,10 +88,11 @@ export default function Admin() {
           formData.append("caption", files.length > 1 ? `${caption} (${i + 1})` : caption); 
           formData.append("location", location);
           formData.append("category", category);
+          formData.append("password", password.trim());
 
           const res = await fetch("/api/photos", {
             method: "POST",
-            headers: { "Authorization": password },
+            headers: { "Authorization": `Bearer ${password}` },
             body: formData,
           });
 
@@ -83,8 +111,8 @@ export default function Admin() {
       alert(`处理完成！\n成功: ${successCount} 张\n失败: ${failCount} 张`);
       setFiles([]); setCaption(""); setLocation("");
       fetchPhotos();
-    } catch (error: any) {
-      alert("上传流程发生意外错误: " + error.message);
+    } catch (error: unknown) {
+      alert("上传流程发生意外错误: " + (error instanceof Error ? error.message : String(error)));
     } finally {
       setUploading(false); setProgress("");
     }
@@ -94,8 +122,8 @@ export default function Admin() {
     if (!confirm("确定要删除这张回忆吗？")) return;
     await fetch("/api/photos", {
       method: "DELETE",
-      headers: { "Authorization": password },
-      body: JSON.stringify({ id }),
+      headers: { "Authorization": `Bearer ${password}` },
+      body: JSON.stringify({ id, password: password.trim() }),
     });
     fetchPhotos();
   };
@@ -112,6 +140,9 @@ export default function Admin() {
             value={password} 
             onChange={(e) => setPassword(e.target.value)} 
           />
+          {authError && (
+            <div className="text-sm text-red-600 mb-3">{authError}</div>
+          )}
           <button onClick={checkLogin} className="w-full bg-rose-500 text-white py-3 rounded-lg hover:bg-rose-600 transition font-bold">确认</button>
         </div>
       </div>
@@ -123,7 +154,7 @@ export default function Admin() {
       <div className="max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-gray-800">后台管理面板</h1>
-          <a href="/" className="text-rose-600 font-medium hover:underline">返回首页 →</a>
+          <Link href="/" className="text-rose-600 font-medium hover:underline">返回首页 →</Link>
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200 mb-8">

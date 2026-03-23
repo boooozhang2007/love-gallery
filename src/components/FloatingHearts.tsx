@@ -1,21 +1,25 @@
 "use client";
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
+
+function rand01(seed: number) {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
 
 const FloatingHearts = () => {
-  const [hearts, setHearts] = useState<{ id: number; left: number; size: number; duration: number; delay: number }[]>([]);
-
-  useEffect(() => {
-    // 生成随机爱心数据
-    const newHearts = Array.from({ length: 15 }).map((_, i) => ({
-      id: i,
-      left: Math.random() * 100, // 随机水平位置 0-100%
-      size: Math.random() * 20 + 10, // 随机大小 10-30px
-      duration: Math.random() * 10 + 10, // 随机持续时间 10-20s
-      delay: Math.random() * 5, // 随机延迟
-    }));
-    setHearts(newHearts);
-  }, []);
+  const hearts = useMemo(
+    () =>
+      Array.from({ length: 15 }).map((_, i) => ({
+        id: i,
+        left: rand01(i + 1) * 100, // 0-100%
+        size: rand01(i + 2) * 20 + 10, // 10-30px
+        duration: rand01(i + 3) * 10 + 10, // 10-20s
+        delay: rand01(i + 4) * 5, // 0-5s
+        drift: rand01(i + 5) * 50 - 25, // -25..25
+      })),
+    []
+  );
 
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
@@ -26,7 +30,7 @@ const FloatingHearts = () => {
           animate={{
             y: "-10vh",
             opacity: [0, 0.6, 0], // 淡入 -> 可见 -> 淡出
-            x: [0, Math.random() * 50 - 25, 0], // 稍微左右摆动
+            x: [0, heart.drift, 0], // 稍微左右摆动
           }}
           transition={{
             duration: heart.duration,

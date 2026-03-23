@@ -39,12 +39,12 @@ export default function Home() {
         
         {/* Filter Tabs */}
         <div className="mt-8 flex justify-center gap-4">
-          {["all", "travel", "daily"].map((f) => (
+          {(["all", "travel", "daily"] as const).map((f) => (
             <motion.button
               key={f}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => setFilter(f as any)}
+              onClick={() => setFilter(f)}
               className={`px-6 py-2 rounded-full text-sm font-medium transition-all shadow-sm ${
                 filter === f ? "bg-rose-400 text-white shadow-rose-200 shadow-lg ring-2 ring-rose-200" : "bg-white/80 backdrop-blur-sm text-rose-600 hover:bg-rose-100"
               }`}
